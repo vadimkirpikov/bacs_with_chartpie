@@ -56,26 +56,9 @@ function get_all_visible_tasks($courses){
 }
 
 class chart_controller{
-    private static function get_default_data(){
-        $default_data = new stdClass();
-        $default_data->course = 0;
-        $default_data->from = time()-time()%86400;
-        $default_data->to = time();
-        $all_courses = get_visible_courses();
-        $tasks = get_all_visible_tasks($all_courses);
-        $keys = array_keys($tasks);
-        $default_data->task = $keys[0];
-        return $default_data;
-    }
     public static function make_pie($test_form, $string, $DB){
         $view_bag = new stdClass();
-        $test_form->set_data(self::get_default_data());
-        if ($req_data = $test_form->get_data()){
-            $data = $req_data;
-        }
-        else {
-            $data = self::get_default_data();
-        }
+        $data = $test_form->get_data();
         $all_courses = get_visible_courses();
         $view_bag->task_id = get_all_visible_tasks($all_courses)[$data->task];
         $view_bag->course = $data->course;
@@ -122,6 +105,28 @@ class chart_view{
     }
 }
 class moodle_filter_form extends moodleform{
+    public function __construct()
+    {
+
+        $all_courses = get_visible_courses();
+        $tasks = get_all_visible_tasks($all_courses);
+        $keys = array_keys($tasks);
+        $from = new DateTime("now", core_date::get_server_timezone_object());
+        $from->setTime(0, 0, 0);
+        $to = new DateTime("now", core_date::get_server_timezone_object());
+
+        $this->default_data = new stdClass();
+        $this->default_data->course = 0;
+        $this->default_data->from = $from->getTimestamp();
+        $this->default_data->to = $to->getTimestamp();
+        $this->default_data->task = $keys[0];
+        parent::__construct();
+    }
+    public function get_data(){
+        $data = parent::get_data();
+        if (!$data) $data = $this->default_data;
+        return $data;
+    }
     public function definition()
     {
         $courses_select_name[0] = "ALL";
@@ -131,18 +136,18 @@ class moodle_filter_form extends moodleform{
         }
         $task_ids = get_all_visible_tasks($courses);
         $mform = $this->_form;
-        $mform->addElement("select", "course", "course", $courses_select_name);
-        $mform->addElement("select", "task", "ID", $task_ids);
-        $mform->addElement("date_time_selector", "from", "from");
-        $mform->addElement("date_time_selector", "to", "to");
-        $mform->addElement('submit', 'submitbutton', "Save");
+        $mform->addElement("select", "course", "COURSE", $courses_select_name);
+        $mform->addElement("select", "task", "TASK", $task_ids);
+        $mform->addElement("date_time_selector", "from", "FROM");
+        $mform->addElement("date_time_selector", "to", "TO");
+        $mform->addElement('submit', 'submitbutton', "SAVE");
+        $this->set_data($this->default_data);
     }
 }
 
 $test_form = new moodle_filter_form();
 $view_bag = chart_controller::make_pie($test_form, $string, $DB);
 chart_view::display_data($test_form, $view_bag);
-
 
 
 
