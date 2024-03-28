@@ -1,7 +1,7 @@
 <?php
 global $PAGE, $OUTPUT, $DB, $string, $CFG;
 require_once('config.php');
-require_once 'mod\bacs\lang\en\bacs.php';
+require_once 'mod/bacs/lib.php';
 require_once("$CFG->libdir/formslib.php");
 
 require_login();
@@ -76,7 +76,7 @@ class chart_controller{
             if ($count>0)
             {
                 $view_bag->counts[] = $count;
-                $view_bag->label_values[] = $string['submit_verdict_'.$i];
+                $view_bag->label_values[] = format_verdict($i);
             }
         }
 
