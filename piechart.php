@@ -12,8 +12,7 @@ $PAGE->set_title('SUBMISSION RESULTS CHART');
 $PAGE->set_heading('SUBMISSION RESULTS CHART');
 
 function get_visible_courses(){
-    global $DB;
-    $all_courses = $DB->get_records('course');
+    $all_courses = get_courses();
     foreach ($all_courses as $course){
         $context = context_course::instance($course->id);
         if (has_capability("mod/bacs:viewany", $context)){
@@ -24,11 +23,11 @@ function get_visible_courses(){
 }
 function get_contests_from_the_course($course_id){
     global $DB;
-    return $DB->get_records_sql("SELECT id FROM mdl_bacs WHERE course=$course_id;");
+    return $DB->get_records_sql("SELECT id FROM {bacs} WHERE course=$course_id;");
 }
 function get_tasks_from_the_contest($contest_id){
     global $DB;
-    return $DB->get_records_sql("SELECT t2.task_id,t2.name FROM mdl_bacs_tasks_to_contests AS t1 INNER JOIN mdl_bacs_tasks as t2 ON t1.task_id=t2.task_id WHERE t1.contest_id=$contest_id;");
+    return $DB->get_records_sql("SELECT t2.task_id,t2.name FROM {bacs_tasks_to_contests} AS t1 INNER JOIN {bacs_tasks} as t2 ON t1.task_id=t2.task_id WHERE t1.contest_id=$contest_id;");
 }
 function get_contests_from_any_courses($courses){
     $result_contests = array();
@@ -71,7 +70,7 @@ class chart_controller{
         for ($i = 0; $i<19; $i++){
             $count = 0;
             foreach ($contests as $contest){
-                $count += $DB->get_field_sql("SELECT COUNT(*) FROM mdl_bacs_submits WHERE result_id=$i AND contest_id=$contest->id AND task_id=$data->task AND submit_time>=$data->from AND submit_time<=$data->to;");
+                $count += $DB->get_field_sql("SELECT COUNT(*) FROM {bacs_submits} WHERE result_id=$i AND contest_id=$contest->id AND task_id=$data->task AND submit_time>=$data->from AND submit_time<=$data->to;");
             }
             if ($count>0)
             {
@@ -129,11 +128,12 @@ class moodle_filter_form extends moodleform{
     }
     public function definition()
     {
-        $courses_select_name[0] = "ALL";
         $courses = get_visible_courses();
         foreach ($courses as $course){
             $courses_select_name[$course->id] = $course->shortname;
         }
+        if (count($courses_select_name)>0)
+            $courses_select_name[0] = "ALL";
         $task_ids = get_all_visible_tasks($courses);
         $mform = $this->_form;
         $mform->addElement("select", "course", "COURSE", $courses_select_name);
@@ -148,6 +148,3 @@ class moodle_filter_form extends moodleform{
 $test_form = new moodle_filter_form();
 $view_bag = chart_controller::make_pie($test_form, $string, $DB);
 chart_view::display_data($test_form, $view_bag);
-
-
-
