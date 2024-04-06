@@ -1,71 +1,65 @@
 <?php
-global $PAGE, $OUTPUT, $DB, $string, $CFG;
+global $PAGE, $OUTPUT, $DB, $CFG;
 require_once('config.php');
 require_once 'mod/bacs/lib.php';
 require_once("$CFG->libdir/formslib.php");
 
-require_login();
-
-$PAGE->set_url("/mod/bacs/piechart.php");
-$PAGE->set_pagelayout('standard');
-$PAGE->set_title('SUBMISSION RESULTS CHART');
-$PAGE->set_heading('SUBMISSION RESULTS CHART');
-
-function get_visible_courses(){
-    $all_courses = get_courses();
-    foreach ($all_courses as $course){
-        $context = context_course::instance($course->id);
-        if (has_capability("mod/bacs:viewany", $context)){
-            $visible_courses[] = $course;
-        }
-    }
-    return $visible_courses;
-}
-function get_contests_from_the_course($course_id){
-    global $DB;
-    return $DB->get_records_sql("SELECT id FROM {bacs} WHERE course=$course_id;");
-}
-function get_tasks_from_the_contest($contest_id){
-    global $DB;
-    return $DB->get_records_sql("SELECT t2.task_id,t2.name FROM {bacs_tasks_to_contests} AS t1 INNER JOIN {bacs_tasks} as t2 ON t1.task_id=t2.task_id WHERE t1.contest_id=$contest_id;");
-}
-function get_contests_from_any_courses($courses){
-    $result_contests = array();
-    foreach ($courses as $course){
-        $contests = get_contests_from_the_course($course->id);
-        if (count($contests)>0){
-            foreach ($contests as $contest){
-                $result_contests[] = $contest;
+class database_manipulator{
+    public static function get_visible_courses(){
+        $all_courses = get_courses();
+        foreach ($all_courses as $course){
+            $context = context_course::instance($course->id);
+            if (has_capability("mod/bacs:viewany", $context)){
+                $visible_courses[] = $course;
             }
         }
+        return $visible_courses;
     }
-    return $result_contests;
-}
-function get_all_visible_tasks($courses){
-    $result_contests = get_contests_from_any_courses($courses);
-    if (count($result_contests)>0){
-        foreach ($result_contests as $contest){
-            $tasks = get_tasks_from_the_contest($contest->id);
-            foreach ($tasks as $task){
-                $all_visible_tasks[$task->task_id] = $task->name;
+    public static function get_contests_from_the_course($course_id){
+        global $DB;
+        return $DB->get_records_sql("SELECT id FROM {bacs} WHERE course=$course_id;");
+    }
+    public static function get_tasks_from_the_contest($contest_id){
+        global $DB;
+        return $DB->get_records_sql("SELECT t2.task_id,t2.name FROM {bacs_tasks_to_contests} AS t1 INNER JOIN {bacs_tasks} as t2 ON t1.task_id=t2.task_id WHERE t1.contest_id=$contest_id;");
+    }
+    public static function get_contests_from_any_courses($courses){
+        $result_contests = array();
+        foreach ($courses as $course){
+            $contests = self::get_contests_from_the_course($course->id);
+            if (count($contests)>0){
+                foreach ($contests as $contest){
+                    $result_contests[] = $contest;
+                }
             }
         }
+        return $result_contests;
     }
-    return $all_visible_tasks;
+    public static function get_all_visible_tasks($courses){
+        $result_contests = self::get_contests_from_any_courses($courses);
+        if (count($result_contests)>0){
+            foreach ($result_contests as $contest){
+                $tasks = self::get_tasks_from_the_contest($contest->id);
+                foreach ($tasks as $task){
+                    $all_visible_tasks[$task->task_id] = $task->name;
+                }
+            }
+        }
+        return $all_visible_tasks;
+    }
 }
-
 class chart_controller{
-    public static function make_pie($test_form, $string, $DB){
+    public static function make_pie($test_form, $DB){
         $view_bag = new stdClass();
         $data = $test_form->get_data();
-        $all_courses = get_visible_courses();
-        $view_bag->task_id = get_all_visible_tasks($all_courses)[$data->task];
+        $all_courses = database_manipulator::get_visible_courses();
+        $view_bag->task_id = database_manipulator::get_all_visible_tasks($all_courses)[$data->task];
         $view_bag->course = $data->course;
         if ($data->course==0){
-            $contests = get_contests_from_any_courses($all_courses);
+            $contests = database_manipulator::get_contests_from_any_courses($all_courses);
         }
         else{
-            $contests = get_contests_from_the_course($data->course);
+            $contests = database_manipulator::get_contests_from_the_course($data->course);
         }
         for ($i = 0; $i<19; $i++){
             $count = 0;
@@ -107,8 +101,8 @@ class moodle_filter_form extends moodleform{
     public function __construct()
     {
 
-        $all_courses = get_visible_courses();
-        $tasks = get_all_visible_tasks($all_courses);
+        $all_courses = database_manipulator::get_visible_courses();
+        $tasks = database_manipulator::get_all_visible_tasks($all_courses);
         $keys = array_keys($tasks);
         $from = new DateTime("now", core_date::get_server_timezone_object());
         $from->setTime(0, 0, 0);
@@ -128,13 +122,13 @@ class moodle_filter_form extends moodleform{
     }
     public function definition()
     {
-        $courses = get_visible_courses();
+        $courses = database_manipulator::get_visible_courses();
         foreach ($courses as $course){
             $courses_select_name[$course->id] = $course->shortname;
         }
         if (count($courses_select_name)>0)
             $courses_select_name[0] = "ALL";
-        $task_ids = get_all_visible_tasks($courses);
+        $task_ids = database_manipulator::get_all_visible_tasks($courses);
         $mform = $this->_form;
         $mform->addElement("select", "course", "COURSE", $courses_select_name);
         $mform->addElement("select", "task", "TASK", $task_ids);
@@ -145,6 +139,12 @@ class moodle_filter_form extends moodleform{
     }
 }
 
+require_login();
+$PAGE->set_url("/mod/bacs/piechart.php");
+$PAGE->set_pagelayout('standard');
+$PAGE->set_title('SUBMISSION RESULTS CHART');
+$PAGE->set_heading('SUBMISSION RESULTS CHART');
 $test_form = new moodle_filter_form();
-$view_bag = chart_controller::make_pie($test_form, $string, $DB);
+$view_bag = chart_controller::make_pie($test_form, $DB);
 chart_view::display_data($test_form, $view_bag);
+
